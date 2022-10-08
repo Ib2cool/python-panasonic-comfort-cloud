@@ -58,3 +58,17 @@ class NanoeMode(Enum):
     On = 2
     ModeG = 3
     All = 4
+
+class Action(Enum):
+    On = True
+    Off = False
+
+class WeekDays(Enum):
+    Monday = 0
+    Tuesday = 1
+    Wednesday = 2
+    Thursday = 3
+    Friday = 4
+    Saturda = 5
+    Sunday= 6
+    

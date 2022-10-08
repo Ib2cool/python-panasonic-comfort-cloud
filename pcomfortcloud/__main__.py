@@ -16,8 +16,9 @@ def print_result(obj, indent = 0):
         elif isinstance(value, list):
             print(" "*indent + "{0: <{width}}:".format(key, width=25-indent))
             for elt in value:
-                print_result(elt, indent + 4)
-                print("")
+                if len(elt) > 0:
+                    print_result(elt, indent + 4)
+                    print("")
         else:
             print(" "*indent + "{0: <{width}}: {1}".format(key, value, width=25-indent))
 
@@ -28,6 +29,15 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
+def add_weekDay(pattern = {}):
+    for dayNo in range(len(pattern.get('weeklyTimerList', []))):
+        if 'patternList' in pattern['weeklyTimerList'][dayNo]:
+            pattern['weeklyTimerList'][dayNo] = {
+                'weekDay': pcomfortcloud.constants.WeekDays(dayNo).name,
+                'patternList': pattern['weeklyTimerList'][dayNo]['patternList']
+            }
+    return pattern
 
 def main():
     """ Start pcomfortcloud Comfort Cloud command line """
@@ -177,6 +187,20 @@ def main():
         type=int,
         help='Device number 1-x')
 
+    timer_parser = commandparser.add_parser(
+        'timer',
+        help="Weekly Timer")
+
+    timer_parser.add_argument(
+        dest='device',
+        type=int,
+        help='Device number 1-x')
+
+    timer_parser.add_argument(
+        dest='action',
+        type=str,
+        help="Timer action (On, Off, Dump)")
+
     history_parser = commandparser.add_parser(
         'history',
         help="Dump history of a device")
@@ -261,6 +285,16 @@ def main():
             device = session.get_devices()[int(args.device) - 1]
 
             print_result(session.dump(device['id']))
+
+        if args.command == 'timer':
+            if int(args.device) <= 0 or int(args.device) > len(session.get_devices()):
+                raise Exception("device not found, acceptable device id is from {} to {}".format(1, len(session.get_devices())))
+
+            device = session.get_devices()[int(args.device) - 1]
+            if args.action in ("On", "Off"):
+                session.timerOnOff(device['id'], args.action)
+            else:
+                print_result(add_weekDay(session.timer(device['id'])))
 
         if args.command == 'history':
             if int(args.device) <= 0 or int(args.device) > len(session.get_devices()):

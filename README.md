@@ -16,6 +16,7 @@ positional arguments:
     get                 Get status of a device
     set                 Set status of a device
     dump                Dump raw data of a device
+    timer               Timer raw data of a device
     history             Dump history of a device
     
 optional arguments:
@@ -88,6 +89,17 @@ positional arguments:
   device      Device number 1-x
   mode        mode (Day, Week, Month, Year)
   date        date of day like 20190807
+
+optional arguments:
+  -h, --help  show this help message and exit
+```
+
+```
+usage: pcomfortcloud username password timer [-h] device action
+
+positional arguments:
+  device      Device number 1-x
+  action      Timer action (On, Off, Dump)
 
 optional arguments:
   -h, --help  show this help message and exit

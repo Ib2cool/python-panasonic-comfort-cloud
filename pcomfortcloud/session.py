@@ -17,6 +17,13 @@ def _validate_response(response):
         return
     raise ResponseError(response.status_code, response.text)
 
+def remove_propertys(pattern = {}):
+    for dayNo in range(len(pattern.get('weeklyTimerList', []))):
+        if 'patternList' in pattern['weeklyTimerList'][dayNo]:
+            for entry in range(len(pattern['weeklyTimerList'][dayNo].get('patternList', []))):
+                if 'propertys' in pattern['weeklyTimerList'][dayNo]['patternList'][entry]:
+                    del pattern['weeklyTimerList'][dayNo]['patternList'][entry]['propertys']
+    return pattern
 
 class Error(Exception):
     ''' Panasonic session error '''
@@ -217,6 +224,79 @@ class Session(object):
             return json.loads(response.text)
 
         return None
+
+    def timer(self, id):
+        deviceGuid = self._deviceIndexer.get(id)
+
+        if(deviceGuid):
+            response = None
+            
+            try:
+                response = requests.get(urls.get_weeklyTimer(deviceGuid), headers=self._headers(), verify=self._verifySsl)
+
+                if 2 != response.status_code // 100:
+                    raise ResponseError(response.status_code, response.text)
+
+            except requests.exceptions.RequestException as ex:
+                raise RequestError(ex)
+
+            _validate_response(response)
+            if(self._raw is True):
+                print("--- history()")
+                print("--- raw beginning ---")
+                print(response.text)
+                print("--- raw ending    ---")
+
+            _json = json.loads(response.text)
+
+            if 'devWeeklyTimerList' in _json:
+                if isinstance(_json['devWeeklyTimerList'], list):
+                    return _json['devWeeklyTimerList'][0]
+        return None
+
+    def timerOnOff(self, id, action):
+        try:
+            OfOff = constants.Action[action].value
+        except KeyError:
+            raise Exception("Wrong mode parameter")
+
+        pattern = self.timer(id)
+        pattern = remove_propertys(pattern)
+
+        if 'avlFlg' in pattern:
+            pattern['avlFlg'] = OfOff
+        else:
+            raise ResponseError("Cannot modify. avlFlg not found")
+
+        deviceGuid = self._deviceIndexer.get(id)
+        if(deviceGuid):
+            response = None
+
+            if(self._raw is True):
+                print("--- timerOnOff()")
+                print("--- raw out beginning ---")
+                print(pattern)
+                print("--- raw out ending    ---")
+
+            try:
+                response = requests.post(urls.set_weeklyTimer(), json=pattern, headers=self._headers(), verify=self._verifySsl)
+
+                if 2 != response.status_code // 100:
+                    raise ResponseError(response.status_code, response.text)
+
+            except requests.exceptions.RequestException as ex:
+                raise RequestError(ex)
+
+            _validate_response(response)
+
+            if(self._raw is True):
+                print("--- raw in beginning ---")
+                print(response.text)
+                print("--- raw in ending    ---\n")
+
+            return True
+
+        return False
 
     def history(self, id, mode, date, tz="+01:00"):
         deviceGuid = self._deviceIndexer.get(id)

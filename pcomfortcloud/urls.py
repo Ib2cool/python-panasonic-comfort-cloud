@@ -38,3 +38,14 @@ def history():
     return '{base_url}/deviceHistoryData'.format(
         base_url=BASE_URL,
     )
+
+def get_weeklyTimer(guid):
+    return '{base_url}/weeklyTimer/{guid}'.format(
+        base_url=BASE_URL,
+        guid=re.sub('(?i)\%2f', 'f', quote_plus(guid))
+    )
+
+def set_weeklyTimer():
+    return '{base_url}/weeklyTimer/'.format(
+        base_url=BASE_URL)
+    
