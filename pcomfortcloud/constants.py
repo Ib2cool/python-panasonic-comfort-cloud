@@ -62,6 +62,7 @@ class NanoeMode(Enum):
 class Action(Enum):
     On = True
     Off = False
+    Dump = None
 
 class WeekDays(Enum):
     Monday = 0
@@ -69,6 +70,5 @@ class WeekDays(Enum):
     Wednesday = 2
     Thursday = 3
     Friday = 4
-    Saturda = 5
+    Saturday = 5
     Sunday= 6
-    

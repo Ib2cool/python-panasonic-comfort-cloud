@@ -1,5 +1,6 @@
 import argparse
 import json
+from time import strptime
 import pcomfortcloud
 
 from enum import Enum
@@ -198,8 +199,60 @@ def main():
 
     timer_parser.add_argument(
         dest='action',
-        type=str,
+        choices=[
+            pcomfortcloud.constants.Action.On.name,
+            pcomfortcloud.constants.Action.Off.name,
+            pcomfortcloud.constants.Action.Dump.name],
         help="Timer action (On, Off, Dump)")
+
+    edittimer = commandparser.add_parser(
+        'edittimer',
+        help="Set/edit week timer")
+
+    edittimer.add_argument(
+        dest='device',
+        type=int,
+        help='Device number #'
+    )
+
+    edittimer.add_argument(
+        dest='day',
+        choices=[
+            pcomfortcloud.constants.WeekDays.Monday.name,
+            pcomfortcloud.constants.WeekDays.Tuesday.name,
+            pcomfortcloud.constants.WeekDays.Wednesday.name,
+            pcomfortcloud.constants.WeekDays.Thursday.name,
+            pcomfortcloud.constants.WeekDays.Friday.name,
+            pcomfortcloud.constants.WeekDays.Saturday.name,
+            pcomfortcloud.constants.WeekDays.Sunday.name],
+       help="Weekday (Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday)")
+
+    edittimer.add_argument(
+        dest='startTime',
+        type=lambda t: strptime(t, '%H:%M'),
+        help="startTime of Timer")
+
+    edittimer.add_argument(
+        '-p', '--power',
+        choices=[
+            pcomfortcloud.constants.Power.On.name,
+            pcomfortcloud.constants.Power.Off.name],
+        help='Power mode')
+
+    edittimer.add_argument(
+        '-t', '--temperature',
+        type=float,
+        help="Temperature")
+
+    edittimer.add_argument(
+        '-m', '--mode',
+        choices=[
+            pcomfortcloud.constants.OperationMode.Auto.name,
+            pcomfortcloud.constants.OperationMode.Cool.name,
+            pcomfortcloud.constants.OperationMode.Dry.name,
+            pcomfortcloud.constants.OperationMode.Heat.name,
+            pcomfortcloud.constants.OperationMode.Fan.name],
+        help='Operation mode')
 
     history_parser = commandparser.add_parser(
         'history',
@@ -295,6 +348,31 @@ def main():
                 session.timerOnOff(device['id'], args.action)
             else:
                 print_result(add_weekDay(session.timer(device['id'])))
+
+        if args.command == 'edittimer':
+            if int(args.device) <= 0 or int(args.device) > len(session.get_devices()):
+                raise Exception("device not found, acceptable device id is from {} to {}".format(1, len(session.get_devices())))
+
+            device = session.get_devices()[int(args.device) - 1]
+            print("writing to timer '{}' ({})".format(device['name'], device['id']))
+
+            kwargs = {}
+
+            dayNo = pcomfortcloud.constants.WeekDays[args.day].value
+            
+            if args.startTime is not None:
+                kwargs['startTime'] = args.startTime
+
+            if args.power is not None:
+                kwargs['power'] = pcomfortcloud.constants.Power[args.power].value
+
+            if args.temperature is not None:
+                kwargs['temperature'] = args.temperature
+
+            if args.mode is not None:
+                kwargs['mode'] = pcomfortcloud.constants.OperationMode[args.mode].value
+
+            session.timerEdit(device['id'], dayNo, **kwargs)
 
         if args.command == 'history':
             if int(args.device) <= 0 or int(args.device) > len(session.get_devices()):

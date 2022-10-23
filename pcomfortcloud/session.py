@@ -7,6 +7,7 @@ import requests
 import os
 import urllib3
 import hashlib
+from time import strptime, strftime
 
 from . import urls
 from . import constants
@@ -241,13 +242,15 @@ class Session(object):
                 raise RequestError(ex)
 
             _validate_response(response)
+
+            _json = json.loads(response.text)
+
             if(self._raw is True):
                 print("--- history()")
                 print("--- raw beginning ---")
                 print(response.text)
+                # print(json.dumps(_json['devWeeklyTimerList'][0], indent=3, sort_keys=True))
                 print("--- raw ending    ---")
-
-            _json = json.loads(response.text)
 
             if 'devWeeklyTimerList' in _json:
                 if isinstance(_json['devWeeklyTimerList'], list):
@@ -256,7 +259,7 @@ class Session(object):
 
     def timerOnOff(self, id, action):
         try:
-            OfOff = constants.Action[action].value
+            OnOff = constants.Action[action].value
         except KeyError:
             raise Exception("Wrong mode parameter")
 
@@ -264,7 +267,7 @@ class Session(object):
         pattern = remove_propertys(pattern)
 
         if 'avlFlg' in pattern:
-            pattern['avlFlg'] = OfOff
+            pattern['avlFlg'] = OnOff
         else:
             raise ResponseError("Cannot modify. avlFlg not found")
 
@@ -276,6 +279,121 @@ class Session(object):
                 print("--- timerOnOff()")
                 print("--- raw out beginning ---")
                 print(pattern)
+                print("--- raw out ending    ---")
+
+            try:
+                response = requests.post(urls.set_weeklyTimer(), json=pattern, headers=self._headers(), verify=self._verifySsl)
+
+                if 2 != response.status_code // 100:
+                    raise ResponseError(response.status_code, response.text)
+
+            except requests.exceptions.RequestException as ex:
+                raise RequestError(ex)
+
+            _validate_response(response)
+
+            if(self._raw is True):
+                print("--- raw in beginning ---")
+                print(response.text)
+                print("--- raw in ending    ---\n")
+
+            return True
+
+        return False
+
+    def timerEdit(self, id, dayNo, **kwargs):
+        """ Set parameters of device
+
+        Args:
+            id  (str): Id of the device
+            dayNo (int): Day number or dayNo (constants.WeekDays): Day
+            kwargs   : {temperature=float}, {mode=OperationMode}, {power=Power}
+                        or {patt=json pattern list}
+        """
+
+        if isinstance(dayNo, constants.WeekDays):
+            dayNo = dayNo.value
+
+        pattern = self.timer(id)
+        pattern = remove_propertys(pattern)
+
+        if 'avlFlg' not in pattern:
+            raise Exception("Cannot modify. TimerList incomplete")
+        
+        patternDefault = {
+            'mode': constants.OperationMode.Heat.value, 'iAuto': 1, 'nanoe': -255, 
+            'onOff': constants.Power.On.value, 'ecoMode': -255, 'ecoNavi': -255, 
+            'fanSpeed': -255, 'startTime': '12:00', 'airSwingLR': -255, 
+            'airSwingUD': -255, 'fanAutoMode': -255, 'temperature': 16
+        }
+
+        if 'patt' in kwargs:
+            if 'patternList' in pattern['weeklyTimerList'][dayNo]:
+                patternListLength = len(pattern['weeklyTimerList'][dayNo].get('patternList', []))
+                for entry in range(patternListLength):
+                    if 'startTime' in kwargs['patt'][entry] if len(kwargs['patt']) > entry else None:
+                        try:
+                            strptime(kwargs['patt'][entry]['startTime'], '%H:%M')
+                        except ValueError:
+                            raise Exception("Wrong time format")
+                        pattern['weeklyTimerList'][dayNo]['patternList'][entry] = patternDefault.copy()
+                        pattern['weeklyTimerList'][dayNo]['patternList'][entry]['startTime'] = kwargs['patt'][entry]['startTime']
+                        if 'power' in kwargs['patt'][entry]:
+                            pattern['weeklyTimerList'][dayNo]['patternList'][entry]['onOff'] = kwargs['patt'][entry]['power'].value
+                        if 'temperature' in kwargs['patt'][entry]:
+                            try:
+                                float(kwargs['patt'][entry]['temperature'])
+                            except ValueError:
+                                raise Exception("temperature not float")
+                            pattern['weeklyTimerList'][dayNo]['patternList'][entry]['temperature'] = kwargs['patt'][entry]['temperature']
+                        if 'mode' in kwargs['patt'][entry]:
+                            pattern['weeklyTimerList'][dayNo]['patternList'][entry]['mode'] = kwargs['patt'][entry]['mode'].value
+                    else:
+                        pattern['weeklyTimerList'][dayNo]['patternList'][entry] = {}
+        else:
+            if 'startTime' not in kwargs:
+                raise Exception("startTime missing")
+
+            OneSet = False
+            patternDefault['startTime'] = strftime("%H:%M", kwargs['startTime'])
+
+            if 'patternList' in pattern['weeklyTimerList'][dayNo]:
+                patternListLength = len(pattern['weeklyTimerList'][dayNo].get('patternList', []))
+                for entry in range(patternListLength):
+                    if len(pattern['weeklyTimerList'][dayNo]['patternList'][entry]) == 0:
+                        pattern['weeklyTimerList'][dayNo]['patternList'][entry] = patternDefault
+                    if 'startTime' in pattern['weeklyTimerList'][dayNo]['patternList'][entry]:
+                        if strptime(pattern['weeklyTimerList'][dayNo]['patternList'][entry]['startTime'], '%H:%M') > kwargs['startTime']:
+                            if len(pattern['weeklyTimerList'][dayNo]['patternList'][patternListLength-1]) == 0:
+                                del pattern['weeklyTimerList'][dayNo]['patternList'][patternListLength-1]
+                                pattern['weeklyTimerList'][dayNo]['patternList'].insert(entry, patternDefault)
+                            else:
+                                raise Exception("TimerList patternList is full")
+                        if strptime(pattern['weeklyTimerList'][dayNo]['patternList'][entry]['startTime'], '%H:%M') == kwargs['startTime']:
+                            if 'power' in kwargs:
+                                pattern['weeklyTimerList'][dayNo]['patternList'][entry]['onOff'] = kwargs['power']
+                                OneSet = True
+                            if 'temperature' in kwargs:
+                                pattern['weeklyTimerList'][dayNo]['patternList'][entry]['temperature'] = kwargs['temperature']
+                                OneSet = True
+                            if 'mode' in kwargs:
+                                pattern['weeklyTimerList'][dayNo]['patternList'][entry]['mode'] = kwargs['mode']
+                                OneSet = True
+                            if not OneSet:
+                                pattern['weeklyTimerList'][dayNo]['patternList'][entry] = {}
+                            break
+            else:
+                raise Exception("Cannot modify. patternList incomplete")
+
+        deviceGuid = self._deviceIndexer.get(id)
+        if(deviceGuid):
+            response = None
+
+            if(self._raw is True):
+                print("--- timerEdit()")
+                print("--- raw out beginning ---")
+                print(pattern)
+                # print(json.dumps(pattern, indent=3, sort_keys=True))
                 print("--- raw out ending    ---")
 
             try:

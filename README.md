@@ -105,6 +105,25 @@ optional arguments:
   -h, --help  show this help message and exit
 ```
 
+```
+usage: pcomfortcloud username password edittimer [-h] device day time
+
+positional arguments:
+  device      Device number 1-x
+  day         weekday (All, Monday, Tuesday, Wednesday...)
+  time        time of day like 15:37
+
+optional arguments: (To delete time don't apply any arguments)
+  -h, --help
+                        show this help message and exit
+  -p, --power {On,Off}
+                        Power mode
+  -t, --temperature TEMPERATURE
+                        Temperature in decimal format
+  -m, --mode {Auto,Cool,Dry,Heat,Fan}
+                        Operation mode
+```
+
 ## Module usage
 
 
@@ -123,6 +142,30 @@ print(session.get_device(devices[0]['id']))
 session.set_device(devices[0]['id'],
   power = pcomfortcloud.constants.Power.On,
   temperature = 22.0)
+
+timerPattern = [
+  {
+    'startTime':'06:00',
+    'mode':pcomfortcloud.constants.OperationMode.Heat,
+    'power':pcomfortcloud.constants.Power.On,
+    'temperature':22.0
+  },
+  {
+    'startTime':'08:00',
+    'mode':pcomfortcloud.constants.OperationMode.Heat,
+    'power':pcomfortcloud.constants.Power.On,
+    'temperature':24.0
+  },
+  {
+    'startTime':'22:00',
+    'power':pcomfortcloud.constants.Power.Off
+  }
+]
+
+session.timerEdit(devices[0]['id'],
+  pcomfortcloud.constants.WeekDays.Wednesday,
+  patt=timerPattern)
+
 ```
 
 ## PyPi package
